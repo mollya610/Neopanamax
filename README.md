@@ -1,2 +1,2 @@
 # Neopanamax
-Panama Canal parametric insurance launch lab work 
+Panama Canal parametric insurance - Launch Lab
