@@ -1,3 +1,9 @@
+# STILL NEED: 
+# how many of each vessel type? 
+# and what size are each of the vessels of these types? 
+# and how full are these/what volume? 
+# and then run that through with the data 
+
 # getting price data from: 
 # https://pancanal.com/maritime-services/tarifas-maritimas/
 
