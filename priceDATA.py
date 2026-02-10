@@ -1,9 +1,29 @@
 # getting price data from: 
 # https://pancanal.com/maritime-services/tarifas-maritimas/
 
+# FUNCTIONS TO CALC PRICES ARE AT END: 
+#   reg_container(totalteu, full, empty)
+#   super_container(totalteu, full, empty)
+#   npnmx_container(totalteu, full, empty)
+#   reg_drybulk(dwt)
+#   super_drybulk(dwt)
+#   npnmx_drybulk(dwt)
+#   reg_lng(volume_m3)
+#   super_lng(volume_m3)
+#   npnmx_lng(volume_m3)
+#   reg_lpg(volume_m3)
+#   super_lpg(volume_m3)
+#   npnmx_lpg(volume_m3)
+#   reg_vehicle(cp)
+#   super_vehicle(cp)
+#   npnmx_vehicle(cp)
+#   reg_tanker(cp)
+#   super_tanker(cp)
+#   npnmx_tanker(cp)
+
+
 import pandas as pd 
 import numpy as np 
-
 
 #---- TRANSIT CHARGES --------- #  
 # REGULAR VESSEL 
@@ -83,3 +103,89 @@ npnmx_lpg_m3 = 2.75
 reg_lng_m3 = 3.5
 super_lng_m3 = 3.85
 npnmx_lng_m3 = 2.05
+
+
+#------CALCULATING VESSEL PRICES
+## CONTAINER EQUATIONS 
+def reg_container(totalteu,full,empty): 
+    transit_charge = regular3 
+    teucap_charge = (reg_teu_capacity*totalteu)
+    teufull_charge = (reg_teu_loaded*full)
+    teuempty_charge = (reg_teu_empty*empty)
+    return transit_charge + teucap_charge + teufull_charge + teuempty_charge
+def super_container(totalteu,full,empty): 
+    transit_charge = super1
+    teucap_charge = (super_teu_capacity*totalteu)
+    teufull_charge = (super_teu_loaded*full)
+    teuempty_charge = (super_teu_empty*empty)
+    return transit_charge + teucap_charge + teufull_charge + teuempty_charge
+def npnmx_container(totalteu,full,empty): 
+    if totalteu < 10000: 
+        transit_charge = npnmx1
+    else: 
+        transit_charge = npnmx2
+    teucap_charge = (npnmx_teu_capacity*totalteu)
+    teufull_charge = (npnmx_teu_loaded*full)
+    teuempty_charge = (npnmx_teu_empty*empty)
+    return transit_charge + teucap_charge + teufull_charge + teuempty_charge
+
+## DRY BULK EQUATIONS 
+def reg_drybulk(dwt):
+    transit_charge = regular3
+    tpm_charge = reg_drybulk_tpm * dwt
+    return transit_charge + tpm_charge
+def super_drybulk(dwt):
+    transit_charge = super1
+    tpm_charge = super_drybulk_tpm * dwt
+    return transit_charge + tpm_charge
+def npnmx_drybulk(dwt):
+    transit_charge = npnmx2
+    tpm_charge = npmnx_drybulk_tpm * dwt
+    return transit_charge + tpm_charge
+
+## LNG
+def reg_lng(volume_m3):
+    transit_charge = regular3
+    m3_charge = reg_lng_m3 * volume_m3
+    return transit_charge + m3_charge
+def super_lng(volume_m3):
+    transit_charge = super1
+    m3_charge = super_lng_m3 * volume_m3
+    return transit_charge + m3_charge
+def npnmx_lng(volume_m3):
+    transit_charge = npnmx2
+    m3_charge = npnmx_lng_m3 * volume_m3
+    return transit_charge + m3_charge
+
+# LPG 
+def reg_lpg(volume_m3):
+    return regular3 + reg_lpg_m3 * volume_m3
+def super_lpg(volume_m3):
+    return super1 + super_lpg_m3 * volume_m3
+def npnmx_lpg(volume_m3):
+    return npnmx2 + npnmx_lpg_m3 * volume_m3
+
+# VEHICLES 
+def reg_vehicle(cp):
+    transit_charge = regular3
+    cp_charge = reg_vehicle_cp * cp
+    return transit_charge + cp_charge
+def super_vehicle(cp):
+    transit_charge = super1
+    cp_charge = super_vehicle_cp * cp
+    return transit_charge + cp_charge
+def npnmx_vehicle(cp):
+    transit_charge = npnmx2
+    cp_charge = npnmx_vehicle_cp * cp
+    return transit_charge + cp_charge
+
+# TANKERS 
+def reg_tanker(cp):
+    return regular3 + reg_tanker_cp * cp
+def super_tanker(cp):
+    return super1 + super_tanker_cp * cp
+def npnmx_tanker(cp):
+    return npnmx2 + npnmx_tanker_cp * cp
+
+
+
