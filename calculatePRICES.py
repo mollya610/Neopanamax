@@ -1,36 +1,13 @@
-# STILL NEED: 
-# how many of each vessel type? 
-# and what size are each of the vessels of these types? 
-# and how full are these/what volume? 
-# and then run that through with the data 
-
 # getting price data from: 
 # https://pancanal.com/maritime-services/tarifas-maritimas/
-
-# FUNCTIONS TO CALC PRICES ARE AT END: 
-#   reg_container(totalteu, full, empty)
-#   super_container(totalteu, full, empty)
-#   npnmx_container(totalteu, full, empty)
-#   reg_drybulk(dwt)
-#   super_drybulk(dwt)
-#   npnmx_drybulk(dwt)
-#   reg_lng(volume_m3)
-#   super_lng(volume_m3)
-#   npnmx_lng(volume_m3)
-#   reg_lpg(volume_m3)
-#   super_lpg(volume_m3)
-#   npnmx_lpg(volume_m3)
-#   reg_vehicle(cp)
-#   super_vehicle(cp)
-#   npnmx_vehicle(cp)
-#   reg_tanker(cp)
-#   super_tanker(cp)
-#   npnmx_tanker(cp)
-
 
 import pandas as pd 
 import numpy as np 
 
+#######################################################
+#######################################################
+## PART ONE: defining costs based on vessel size and type (maybe would be easier 
+#######################################################
 #---- TRANSIT CHARGES --------- #  
 # REGULAR VESSEL 
 # Other 
@@ -111,87 +88,146 @@ super_lng_m3 = 3.85
 npnmx_lng_m3 = 2.05
 
 
-#------CALCULATING VESSEL PRICES
-## CONTAINER EQUATIONS 
-def reg_container(totalteu,full,empty): 
-    transit_charge = regular3 
-    teucap_charge = (reg_teu_capacity*totalteu)
-    teufull_charge = (reg_teu_loaded*full)
-    teuempty_charge = (reg_teu_empty*empty)
-    return transit_charge + teucap_charge + teufull_charge + teuempty_charge
-def super_container(totalteu,full,empty): 
-    transit_charge = super1
-    teucap_charge = (super_teu_capacity*totalteu)
-    teufull_charge = (super_teu_loaded*full)
-    teuempty_charge = (super_teu_empty*empty)
-    return transit_charge + teucap_charge + teufull_charge + teuempty_charge
-def npnmx_container(totalteu,full,empty): 
-    if totalteu < 10000: 
-        transit_charge = npnmx1
+##############################################################
+##############################################################
+## PART TWO: MAKE IT INTO DICTIONARY SO ITS EASIER TO USE 
+##################################################################
+# -- DICTIONARIES 
+transit_charge_reg = {
+    ("regular","other"): regular1,
+    ("regular","gencargo"): regular2,
+    ("regular","fridge"): regular2,
+    ("regular","container"): regular3,
+    ("regular","vehicle"): regular3,
+    ("regular","tanker"): regular3,
+    ("regular","chemical"): regular3,
+    ("regular","lng"): regular3,
+    ("regular","lpg"): regular3,
+    ("regular","drybulk"): regular3}
+transit_charge= {
+    "super": super1,
+    "npnmx": npnmx2}
+rates = {
+    # containers (tuple = capacity, loaded, empty)
+    ("regular","container"): ("teu", (reg_teu_capacity, reg_teu_loaded, reg_teu_empty)),
+    ("super","container"):   ("teu", (super_teu_capacity, super_teu_loaded, super_teu_empty)),
+    ("npnmx","container"):   ("teu", (npnmx_teu_capacity, npnmx_teu_loaded, npnmx_teu_empty)),
+    # dry bulk (TPM)
+    ("regular","drybulk"): ("dwt", reg_drybulk_tpm),
+    ("super","drybulk"):   ("dwt", super_drybulk_tpm),
+    ("npnmx","drybulk"):   ("dwt", npmnx_drybulk_tpm),
+    # CP vessels
+    ("regular","tanker"):   ("cp", reg_tanker_cp),
+    ("super","tanker"):     ("cp", super_tanker_cp),
+    ("npnmx","tanker"):     ("cp", npnmx_tanker_cp),
+    ("regular","vehicle"):  ("cp", reg_vehicle_cp),
+    ("super","vehicle"):    ("cp", super_vehicle_cp),
+    ("npnmx","vehicle"):    ("cp", npnmx_vehicle_cp),
+    ("regular","chemical"): ("cp", reg_chemical_cp),
+    ("super","chemical"):   ("cp", super_chemical_cp),
+    ("npnmx","chemical"):   ("cp", npnmx_chemical_cp),
+    # cubic meters
+    ("regular","lng"): ("m3", reg_lng_m3),
+    ("super","lng"):   ("m3", super_lng_m3),
+    ("npnmx","lng"):   ("m3", npnmx_lng_m3),
+    ("regular","lpg"): ("m3", reg_lpg_m3),
+    ("super","lpg"):   ("m3", super_lpg_m3),
+    ("npnmx","lpg"):   ("m3", npnmx_lpg_m3),
+}
+
+#######################################################################
+#######################################################################
+#### PART THREE: MAKE FUNCTIONS FOR CALCULATING VESSEL REVENUE 
+#############################################################################
+def freshwater_surcharge(lake_level):
+    exponent = 0.6*(lake_level-79)
+    lower = 1 + np.exp(exponent)
+    return 0.1/lower
+
+# FUNCTION FOR ANY VESSEL
+def vessel_cost(size,content,volume,lake_level):
+    # size = "regular" or "super" or "npnmx" 
+    # content = "container" or "drybulk" "chemical" or "LPG" "vehicle" "fridge" "tanker" "gencargo" "LNG" or "other" 
+    # volume = value that means either totalteu (make a geuss about full or empty) or dwt or m3 or cp 
+    percent_full = 0.8 # (geuss average percent full for CONTAINER SHIPS ONLY)
+    if size=='regular':
+        base = transit_charge_reg[(size,content)]
     else: 
-        transit_charge = npnmx2
-    teucap_charge = (npnmx_teu_capacity*totalteu)
-    teufull_charge = (npnmx_teu_loaded*full)
-    teuempty_charge = (npnmx_teu_empty*empty)
-    return transit_charge + teucap_charge + teufull_charge + teuempty_charge
+        base = transit_charge[size]
+    measure, rate = rates[(size, content)]
+    # ---- variable charge ----
+    if content == "container":
+        cap, full_rate, empty_rate = rate
+        full = volume*percent_full
+        empty = volume - full 
+        variable = cap*volume + full_rate*full + empty_rate*empty
+    else:
+        variable = rate * volume
+    toll = base + variable
+    surcharge = toll*freshwater_surcharge(lake_level)
+    return toll + surcharge
 
-## DRY BULK EQUATIONS 
-def reg_drybulk(dwt):
-    transit_charge = regular3
-    tpm_charge = reg_drybulk_tpm * dwt
-    return transit_charge + tpm_charge
-def super_drybulk(dwt):
-    transit_charge = super1
-    tpm_charge = super_drybulk_tpm * dwt
-    return transit_charge + tpm_charge
-def npnmx_drybulk(dwt):
-    transit_charge = npnmx2
-    tpm_charge = npmnx_drybulk_tpm * dwt
-    return transit_charge + tpm_charge
 
-## LNG
-def reg_lng(volume_m3):
-    transit_charge = regular3
-    m3_charge = reg_lng_m3 * volume_m3
-    return transit_charge + m3_charge
-def super_lng(volume_m3):
-    transit_charge = super1
-    m3_charge = super_lng_m3 * volume_m3
-    return transit_charge + m3_charge
-def npnmx_lng(volume_m3):
-    transit_charge = npnmx2
-    m3_charge = npnmx_lng_m3 * volume_m3
-    return transit_charge + m3_charge
+#############################################################################
+#############################################################################
+### PART FOUR: READ IN LAKE LEVEL DATA AND TRANSIT DATA 
+#############################################################################
+# water levels and transits 
+os.chdir(r'C:\\Users\\malcor\OneDrive - University of North Carolina at Chapel Hill\Research\Data')
+transits = pd.read_csv('canaltransit_DATA.csv',parse_dates=['date'])
+# lake gatun data 
+url = "https://evtms-rpts.pancanal.com/eng/h2o/Download_Gatun_Lake_Water_Level_History.csv"
+response = requests.get(url, timeout=30)
+with open('lakegatun.csv', 'wb') as file:
+    file.write(response.content)
+gatun = pd.read_csv('lakegatun.csv').rename(columns={'DATE_LOG':'date','GATUN_LAKE_LEVEL(FEET)':'lake_level'})
+gatun['date'] = pd.to_datetime(gatun['date'])
+gatun = gatun[gatun['lake_level']>0]
+gatun['month'] = gatun['date'].dt.month
+gatun['year'] = gatun['date'].dt.year
+gatun_month = gatun.groupby(['month','year'])[['lake_level']].mean().reset_index()
 
-# LPG 
-def reg_lpg(volume_m3):
-    return regular3 + reg_lpg_m3 * volume_m3
-def super_lpg(volume_m3):
-    return super1 + super_lpg_m3 * volume_m3
-def npnmx_lpg(volume_m3):
-    return npnmx2 + npnmx_lpg_m3 * volume_m3
+canaldata = transits.merge(gatun_month,how='inner',on=['month','year'])
 
-# VEHICLES 
-def reg_vehicle(cp):
-    transit_charge = regular3
-    cp_charge = reg_vehicle_cp * cp
-    return transit_charge + cp_charge
-def super_vehicle(cp):
-    transit_charge = super1
-    cp_charge = super_vehicle_cp * cp
-    return transit_charge + cp_charge
-def npnmx_vehicle(cp):
-    transit_charge = npnmx2
-    cp_charge = npnmx_vehicle_cp * cp
-    return transit_charge + cp_charge
+################################################################################
+################################################################################
+### PART FIVE: CALCULATE REVENUE WITH LOTS OF ASSUMPTIONS 
+################################################################################
+# To Test Function: Half container, half dry bulk 
+container_pct = 0.35
+drybulk_pct = 0.25 
+chemical_pct = 0.2 
+lpg_pct = 0.2 
 
-# TANKERS 
-def reg_tanker(cp):
-    return regular3 + reg_tanker_cp * cp
-def super_tanker(cp):
-    return super1 + super_tanker_cp * cp
-def npnmx_tanker(cp):
-    return npnmx2 + npnmx_tanker_cp * cp
+# unit for tanker: pc ums 
+# Calculate, making volume assumptions as well 
+canaldata['regular_rev'] = (
+    canaldata['regular_count']*container_pct*vessel_cost("regular","container",2000,canaldata['lake_level'])
+    + canaldata['regular_count']*drybulk_pct*vessel_cost("regular","drybulk",50000,canaldata['lake_level'])
+    + canaldata['regular_count']*chemical_pct*vessel_cost("regular","chemical",20000,canaldata['lake_level'])
+    + canaldata['regular_count']*lpg_pct*vessel_cost("regular","lng",75000,canaldata['lake_level']))
+
+canaldata['super_rev'] = (
+    canaldata['super_count']*container_pct*vessel_cost("super","container",4000,canaldata['lake_level'])
+    + canaldata['super_count']*drybulk_pct*vessel_cost("super","drybulk",75000,canaldata['lake_level'])
+    + canaldata['super_count']*chemical_pct*vessel_cost("super","chemical",30000,canaldata['lake_level'])
+    + canaldata['super_count']*lpg_pct*vessel_cost("super","lng",150000,canaldata['lake_level']))
+
+canaldata['npnmx_rev'] = (
+    canaldata['neopnmx_count']*container_pct*vessel_cost("npnmx","container",15000,canaldata['lake_level'])
+    + canaldata['neopnmx_count']*drybulk_pct*vessel_cost("npnmx","drybulk",100000,canaldata['lake_level'])
+    + canaldata['neopnmx_count']*chemical_pct*vessel_cost("npnmx","chemical",40000,canaldata['lake_level'])
+    + canaldata['neopnmx_count']*lpg_pct*vessel_cost("npnmx","lng",200000,canaldata['lake_level']))
+
+canaldata['revenue'] = canaldata[['regular_rev','super_rev','npnmx_rev']].sum(axis=1)
+canaldata = canaldata[canaldata['revenue']>0]
+
+cols = ['under80beam_count','over80beam_count','regular_count','super_count','neopnmx_count']
+canaldata[cols] = canaldata[cols].replace(0, np.nan)
+
+
+
+
 
 
 
